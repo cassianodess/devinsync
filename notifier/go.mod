@@ -1,12 +1,15 @@
-module codecolab
+module devinsync
 
 go 1.25.0
 
 require (
+	github.com/gofiber/contrib/v3/websocket v1.2.0
+	github.com/gofiber/fiber/v3 v3.3.0
+)
+
+require (
 	github.com/andybalholm/brotli v1.2.1 // indirect
 	github.com/fasthttp/websocket v1.5.12 // indirect
-	github.com/gofiber/contrib/v3/websocket v1.2.0 // indirect
-	github.com/gofiber/fiber/v3 v3.3.0 // indirect
 	github.com/gofiber/schema v1.8.0 // indirect
 	github.com/gofiber/utils/v2 v2.1.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect

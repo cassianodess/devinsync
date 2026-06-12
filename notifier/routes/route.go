@@ -1,8 +1,8 @@
 package routes
 
 import (
-	"codecolab/domain/entities"
-	"codecolab/handlers"
+	"devinsync/domain/entities"
+	"devinsync/handlers"
 
 	"github.com/gofiber/contrib/v3/websocket"
 	"github.com/gofiber/fiber/v3"

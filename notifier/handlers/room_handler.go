@@ -1,7 +1,7 @@
 package handlers
 
 import (
-	"codecolab/domain/entities"
+	"devinsync/domain/entities"
 	"log"
 	"time"
 

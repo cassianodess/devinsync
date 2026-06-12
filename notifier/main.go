@@ -1,7 +1,7 @@
 package main
 
 import (
-	"codecolab/routes"
+	"devinsync/routes"
 	"log"
 
 	"github.com/gofiber/fiber/v3"
