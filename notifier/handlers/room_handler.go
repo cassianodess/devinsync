@@ -45,6 +45,7 @@ func (this *RoomHandler) Join(ctx *websocket.Conn) {
 	log.Println("Entrou no join")
 	roomID := ctx.Params("id")
 
+
 	client := &entities.Client{
 		Conn:   ctx,
 		RoomID: roomID,
@@ -54,12 +55,14 @@ func (this *RoomHandler) Join(ctx *websocket.Conn) {
 	defer this.hub.UnRegister(roomID, client)
 
 	for {
-		if _, _, err := ctx.ReadMessage(); err != nil {
+		var message []byte
+		var err error
+		if _, message, err = ctx.ReadMessage(); err != nil {
 			break
 		}
 
 		path := "./Desktop/text.txt"
-		content := "Hello world!"
+		content := string(message)
 		now := time.Now().UTC()
 		event := entities.Event{
 			Type:      entities.FileCreatedEvent,
