@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"listener/domain/entities"
@@ -96,8 +97,19 @@ func ListenServer(wsConnection *entities.Connector, w *watcher.Watcher) {
 		switch eventBody.Type {
 		case types.SnapshotCreateEvent:
 			fmt.Println("SnapshotCreateEvent")
+
+			var contentJson *entities.SnapshotSyncContent = &entities.SnapshotSyncContent{
+				DirectoryPath: "diretorio",
+				FileName:      "aquivo.txt",
+				FileContet:    []byte("Hello, World!"),
+			}
+			content, err := json.Marshal(contentJson)
+			if err != nil {
+				log.Fatalln("error while marshal content json: ", err)
+			}
+
 			eventMessage := &entities.Event{
-				Content:   []byte(nil),
+				Content:   []byte(content),
 				Type:      types.SnapshotSyncEvent,
 				CreatedAt: time.Now().UTC(),
 			}
@@ -117,7 +129,28 @@ func ListenServer(wsConnection *entities.Connector, w *watcher.Watcher) {
 				log.Fatal("error while creating guest workspace: ", err)
 			}
 
-			//Cria os demais diretorios e arquivos
+			var contentJson *entities.SnapshotSyncContent = &entities.SnapshotSyncContent{}
+			if err := json.Unmarshal(eventBody.Content, contentJson); err != nil {
+				log.Fatalln("error while unmarshal content json: ", err)
+			}
+
+			log.Println("deu bom: ", contentJson)
+			if err := os.MkdirAll(fmt.Sprintf("%s/%s", guestWorkspacePath, contentJson.DirectoryPath), 0775); err != nil {
+				log.Fatal("error while creating guest workspace: ", err)
+			}
+
+			currentFile, err := os.Create(
+				fmt.Sprintf("%s/%s/%s", guestWorkspacePath, contentJson.DirectoryPath, contentJson.FileName),
+			)
+			if err != nil {
+				log.Fatal("error while creating guest workspace files: ", err)
+			}
+			length, err := currentFile.Write(contentJson.FileContet)
+			if err != nil {
+				log.Fatalln("error while write file: ", err)
+			}
+
+			log.Println("length: ", length)
 
 		}
 

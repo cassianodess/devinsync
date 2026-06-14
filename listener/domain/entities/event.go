@@ -12,3 +12,9 @@ type Event struct {
 	Content   []byte          `json:"content,omitempty"`
 	CreatedAt time.Time       `json:"created_at"`
 }
+
+type SnapshotSyncContent struct {
+	DirectoryPath string `json:"directory_path"`
+	FileName      string `json:"file_name"`
+	FileContet    []byte `json:"file_content"`
+}
