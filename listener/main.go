@@ -1,21 +1,25 @@
 package main
 
 import (
+	"flag"
 	"listener/domain/entities"
 	"listener/services"
 	"log"
-	"os"
 	"time"
 
 	"github.com/radovskyb/watcher"
 )
 
 func main() {
+
+	userPath := flag.String("path", "", "./path/to/dir")
+	flag.Parse()
+	if *userPath == "" {
+		log.Fatal("missing required flag: -path")
+	}
+
 	w := watcher.New()
 
-	//w.SetMaxEvents(1)
-
-	//w.FilterOps(watcher.Rename, watcher.Move)
 	wsConnection, wsConnectionErr := entities.NewConnector("ws://localhost:8080/ws/room/123")
 	if wsConnectionErr != nil {
 		log.Fatal("error while conenction to server: ", wsConnectionErr)
@@ -26,7 +30,7 @@ func main() {
 
 	services.CheckFiles()
 
-	if err := w.AddRecursive(os.Args[1]); err != nil {
+	if err := w.AddRecursive(*userPath); err != nil {
 		log.Fatalln(err)
 	}
 
