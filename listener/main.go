@@ -60,7 +60,7 @@ func main() {
 		log.Fatal("error while conenction to server: ", wsConnectionErr)
 	}
 
-	go ListenServer(wsConnection, w)
+	go ListenServer(wsConnection, w, roomID)
 	go ListenChanges(w, wsConnection)
 
 	if isHost {
@@ -79,7 +79,7 @@ func main() {
 	}
 }
 
-func ListenServer(wsConnection *entities.Connector, w *watcher.Watcher) {
+func ListenServer(wsConnection *entities.Connector, w *watcher.Watcher, roomID *string) {
 	for {
 
 		var eventBody *entities.Event = &entities.Event{}
@@ -96,25 +96,28 @@ func ListenServer(wsConnection *entities.Connector, w *watcher.Watcher) {
 
 		switch eventBody.Type {
 		case types.SnapshotCreateEvent:
-			fmt.Println("SnapshotCreateEvent")
 
-			var contentJson []entities.SnapshotSyncContent = []entities.SnapshotSyncContent{
-				{
-					DirectoryPath: "diretorio",
-					FileName:      "aquivo.txt",
-					FileContet:    []byte("Hello, World!"),
-				},
-				{
-					DirectoryPath: "diretorio",
-					FileName:      "aquivo_dois.txt",
-					FileContet:    []byte("Hello, World Dois!"),
-				},
-				{
-					DirectoryPath: "diretorio_dois",
-					FileName:      "aquivo.txt",
-					FileContet:    []byte("Hello, World novo!"),
-				},
+			var contentJson []entities.SnapshotSyncContent = []entities.SnapshotSyncContent{}
+
+			for filePath, currentFile := range w.WatchedFiles() {
+				if currentFile.IsDir() {
+					continue
+				}
+
+				peaces := strings.Split(filePath, "/")
+				lastLength := (len(filePath) - len(peaces[len(peaces)-1]))
+				formatted := filePath[1 : lastLength-1]
+				log.Printf("path: %s, filename: %s", formatted, currentFile.Name())
+
+				content := entities.SnapshotSyncContent{
+					DirectoryPath: formatted,
+					FileName:      currentFile.Name(),
+					FileContet:    services.GetFileContent(filePath),
+				}
+				fmt.Println("append : ", content)
+				contentJson = append(contentJson, content)
 			}
+
 			content, err := json.Marshal(contentJson)
 			if err != nil {
 				log.Fatalln("error while marshal content json: ", err)
@@ -129,13 +132,12 @@ func ListenServer(wsConnection *entities.Connector, w *watcher.Watcher) {
 				log.Fatal("error while send SnapshotSyncEvent: ", err)
 			}
 		case types.SnapshotSyncEvent:
-			fmt.Println("SnapshotSyncEvent")
 			homeDir, err := os.UserHomeDir()
 			if err != nil {
 				log.Fatal("error while getting home directory: ", err)
 			}
 
-			guestWorkspacePath := fmt.Sprintf("%s/.devinsync/123", homeDir)
+			guestWorkspacePath := fmt.Sprintf("%s/.devinsync/%s", homeDir, *roomID)
 			if err := os.MkdirAll(guestWorkspacePath, 0775); err != nil {
 				log.Fatal("error while creating guest workspace: ", err)
 			}
@@ -147,7 +149,9 @@ func ListenServer(wsConnection *entities.Connector, w *watcher.Watcher) {
 			}
 
 			for _, snapshot := range contentJson {
-				if err := os.MkdirAll(fmt.Sprintf("%s/%s", guestWorkspacePath, snapshot.DirectoryPath), 0775); err != nil {
+				snapshotPath := fmt.Sprintf("%s/%s", guestWorkspacePath, snapshot.DirectoryPath)
+				log.Println("snapshotPath: ", snapshotPath)
+				if err := os.MkdirAll(snapshotPath, 0775); err != nil {
 					log.Fatal("error while creating guest workspace: ", err)
 				}
 
@@ -157,12 +161,14 @@ func ListenServer(wsConnection *entities.Connector, w *watcher.Watcher) {
 				if err != nil {
 					log.Fatal("error while creating guest workspace files: ", err)
 				}
-				length, err := currentFile.Write(snapshot.FileContet)
-				if err != nil {
+				if _, err := currentFile.Write(snapshot.FileContet); err != nil {
 					log.Fatalln("error while write file: ", err)
 				}
 
-				log.Println("length: ", length)
+			}
+
+			if err := w.AddRecursive(guestWorkspacePath); err != nil {
+				log.Fatalln(err)
 			}
 
 		}
