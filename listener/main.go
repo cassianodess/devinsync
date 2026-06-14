@@ -43,7 +43,7 @@ func main() {
 	//TODO: verify by .disignore
 	w.IgnoreHiddenFiles(true)
 
-	var baseURL string = "ws://localhost:8080/ws"
+	var baseURL string = os.Getenv("SERVER_URL")
 	var targetURL string = "host"
 
 	if !isHost {
@@ -90,6 +90,9 @@ func ListenServer(wsConnection *entities.Connector, w *watcher.Watcher, roomID *
 		log.Println("event received: ", eventBody.Type)
 
 		switch eventBody.Type {
+		case types.RoomCreatedEvent:
+			log.Printf("room has been created: [%s]\n", string(eventBody.Content))
+
 		case types.SnapshotCreateEvent:
 
 			var contentJson []entities.SnapshotSyncContent = []entities.SnapshotSyncContent{}
