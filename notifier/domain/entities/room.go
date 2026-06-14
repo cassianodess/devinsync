@@ -48,7 +48,7 @@ func (this *Hub) Register(roomID string, client *Client) {
 			Content:   []byte(nil),
 			CreatedAt: time.Now().UTC(),
 		}
-		this.SendToHost(roomID, snapshotEvent)
+		this.SendToHost(client, snapshotEvent)
 	}
 }
 
@@ -68,26 +68,22 @@ func (this *Hub) UnRegister(roomID string, client *Client) {
 	}
 }
 
-func (this *Hub) Broadcast(roomID string, payload any) {
-	this.mutex.RLock()
-	defer this.mutex.RUnlock()
+func (this *Hub) Broadcast(client *Client, payload any) {
+	clients := this.clients[client.RoomID]
 
-	clients := this.clients[roomID]
-
-	for client := range clients {
-		client.Conn.WriteJSON(payload)
+	for otherClient := range clients {
+		if otherClient.Conn != client.Conn {
+			otherClient.Conn.WriteJSON(payload)
+		}
 	}
 }
 
-func (this *Hub) SendToHost(roomID string, payload any) {
-	this.mutex.RLock()
-	defer this.mutex.RUnlock()
+func (this *Hub) SendToHost(client *Client, payload any) {
+	clients := this.clients[client.RoomID]
 
-	clients := this.clients[roomID]
-
-	for client := range clients {
-		if client.IsHost {
-			client.Conn.WriteJSON(payload)
+	for otherClient := range clients {
+		if otherClient.IsHost {
+			otherClient.Conn.WriteJSON(payload)
 		}
 	}
 }

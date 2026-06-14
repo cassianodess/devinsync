@@ -25,7 +25,7 @@ func HandleEvent(event watcher.Event, connection *entities.Connector) {
 	isFileMoved := (watcher.Move == event.Op) && !event.IsDir()
 
 	if isFolderCreated {
-		fmt.Printf("folder created: %v mode=%v, info=%v", event.IsDir(), event.Mode(), event.FileInfo)
+		fmt.Println("directory created: ", event.Path)
 		eventMessage = &entities.Event{
 			Path:      &event.Path,
 			Content:   nil,
@@ -34,7 +34,7 @@ func HandleEvent(event watcher.Event, connection *entities.Connector) {
 		}
 
 	} else if isFileCreated {
-		fmt.Printf("file create: name= %s, path=%s, content=%s, mode=%v, info=%v", event.Name(), event.Path, GetFileContent(event.Path), event.Mode(), event.FileInfo)
+		fmt.Println("file created", event.Path)
 
 		content := string(GetFileContent(event.Path))
 		eventMessage = &entities.Event{
@@ -45,7 +45,7 @@ func HandleEvent(event watcher.Event, connection *entities.Connector) {
 		}
 
 	} else if isFileSaved {
-		fmt.Printf("file writed: name= %s, path=%s, content=\n--\n%s\n--\n, mode=%v, info=%v", event.Name(), event.Path, GetFileContent(event.Path), event.Mode(), event.FileInfo)
+		fmt.Println("file writed", event.Path)
 
 		content := string(GetFileContent(event.Path))
 		eventMessage = &entities.Event{
@@ -55,7 +55,7 @@ func HandleEvent(event watcher.Event, connection *entities.Connector) {
 			CreatedAt: now,
 		}
 	} else if isDirectoryRemoved {
-		fmt.Println("directory removed: ", event)
+		fmt.Println("directory removed old path:", event.OldPath)
 
 		eventMessage = &entities.Event{
 			Path:      &event.Path,
@@ -64,8 +64,7 @@ func HandleEvent(event watcher.Event, connection *entities.Connector) {
 			CreatedAt: now,
 		}
 	} else if isFileRemoved {
-
-		fmt.Println("file removed: ", event)
+		fmt.Println("file removed old path: ", event.OldPath)
 
 		eventMessage = &entities.Event{
 			Path:      &event.Path,
@@ -76,7 +75,7 @@ func HandleEvent(event watcher.Event, connection *entities.Connector) {
 
 	} else if isDirectoryRenamed {
 
-		fmt.Println("directory renamed: ", event)
+		fmt.Println("directory renamed old path:", event.OldPath)
 		eventMessage = &entities.Event{
 			Path:      &event.Path,
 			OldPath:   &event.OldPath,
@@ -86,7 +85,7 @@ func HandleEvent(event watcher.Event, connection *entities.Connector) {
 		}
 
 	} else if isFileRenamed {
-		fmt.Println("file removed: ", event)
+		fmt.Println("file removed old path: ", event.OldPath)
 
 		content := string(GetFileContent(event.Path))
 		eventMessage = &entities.Event{
@@ -97,6 +96,8 @@ func HandleEvent(event watcher.Event, connection *entities.Connector) {
 			CreatedAt: now,
 		}
 	} else if isDirectoryMoved {
+
+		fmt.Printf("directory moved from %s to %s: ", event.OldPath, event.Path)
 		eventMessage = &entities.Event{
 			Path:      &event.Path,
 			OldPath:   &event.OldPath,
@@ -105,6 +106,7 @@ func HandleEvent(event watcher.Event, connection *entities.Connector) {
 			CreatedAt: now,
 		}
 	} else if isFileMoved {
+		fmt.Printf("file moved from %s to %s: ", event.OldPath, event.Path)
 		content := string(GetFileContent(event.Path))
 		eventMessage = &entities.Event{
 			Path:      &event.Path,

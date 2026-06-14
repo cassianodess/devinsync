@@ -2,17 +2,11 @@ package services
 
 import (
 	"fmt"
-	"log"
 	"os"
 )
 
-func CheckFiles(filePath string) {
-
-	if _, err := os.ReadDir(filePath); err != nil {
-		log.Fatalf("Failed to read directory: %v", err)
-	} else {
-		log.Println("Listening to: ", filePath)
-	}
+func CheckFiles(filePath string) ([]os.DirEntry, error) {
+	return os.ReadDir(filePath)
 }
 
 func GetFileContent(path string) string {

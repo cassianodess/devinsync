@@ -57,7 +57,14 @@ func main() {
 	//	*workspace = fmt.Sprintf("$HOME/.devinsync/%s", *roomID)
 	//}
 
-	services.CheckFiles(*workspace)
+	entries, err := services.CheckFiles(*workspace)
+	if err != nil {
+		log.Fatal("error while finding directories")
+	}
+
+	for _, entry := range entries {
+		fmt.Println("entry: ", entry)
+	}
 
 	if err := w.AddRecursive(*workspace); err != nil {
 		log.Fatalln(err)
@@ -76,7 +83,12 @@ func ListenServer(wsConnection *entities.Connector) {
 			log.Fatal("connection failed: ", err)
 		}
 
-		log.Printf("event received:\nevent=<%s>\ncontent=<%s>\npath=<%s>\ncreated_at=<%s>", eventBody.Type, string(eventBody.Content), eventBody.Path, eventBody.CreatedAt)
+		path := ""
+		if eventBody.Path != nil {
+			path = *eventBody.Path
+		}
+
+		log.Printf("event received:\nevent=<%s>\ncontent=<%s>\npath=<%s>\ncreated_at=<%s>", eventBody.Type, string(eventBody.Content), path, eventBody.CreatedAt)
 
 	}
 
@@ -86,6 +98,7 @@ func ListenChanges(w *watcher.Watcher, wsConnection *entities.Connector) {
 	for {
 		select {
 		case event := <-w.Event:
+
 			services.HandleEvent(event, wsConnection)
 		case err := <-w.Error:
 			log.Fatalln(err)
