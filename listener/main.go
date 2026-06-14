@@ -87,12 +87,7 @@ func ListenServer(wsConnection *entities.Connector, w *watcher.Watcher, roomID *
 			log.Fatal("connection failed: ", err)
 		}
 
-		path := ""
-		if eventBody.Path != nil {
-			path = *eventBody.Path
-		}
-
-		log.Printf("event received:\nevent=<%s>\ncontent=<%s>\npath=<%s>\ncreated_at=<%s>", eventBody.Type, string(eventBody.Content), path, eventBody.CreatedAt)
+		log.Println("event received: ", eventBody.Type)
 
 		switch eventBody.Type {
 		case types.SnapshotCreateEvent:
@@ -107,14 +102,12 @@ func ListenServer(wsConnection *entities.Connector, w *watcher.Watcher, roomID *
 				peaces := strings.Split(filePath, "/")
 				lastLength := (len(filePath) - len(peaces[len(peaces)-1]))
 				formatted := filePath[1 : lastLength-1]
-				log.Printf("path: %s, filename: %s", formatted, currentFile.Name())
 
 				content := entities.SnapshotSyncContent{
 					DirectoryPath: formatted,
 					FileName:      currentFile.Name(),
 					FileContet:    services.GetFileContent(filePath),
 				}
-				fmt.Println("append : ", content)
 				contentJson = append(contentJson, content)
 			}
 
@@ -150,7 +143,6 @@ func ListenServer(wsConnection *entities.Connector, w *watcher.Watcher, roomID *
 
 			for _, snapshot := range contentJson {
 				snapshotPath := fmt.Sprintf("%s/%s", guestWorkspacePath, snapshot.DirectoryPath)
-				log.Println("snapshotPath: ", snapshotPath)
 				if err := os.MkdirAll(snapshotPath, 0775); err != nil {
 					log.Fatal("error while creating guest workspace: ", err)
 				}
@@ -171,6 +163,35 @@ func ListenServer(wsConnection *entities.Connector, w *watcher.Watcher, roomID *
 				log.Fatalln(err)
 			}
 
+		case types.DirectoryCreatedEvent:
+			log.Println("directory created event: ", *eventBody.Path)
+
+		case types.FileCreatedEvent:
+			log.Println("file created event: ", *eventBody.Path)
+
+		case types.DirectoryWritedEvent:
+			log.Println("directory writed: ", *eventBody.Path)
+
+		case types.FileWritedEvent:
+			log.Println("file writed: ", *eventBody.Path)
+
+		case types.DirectoryRemovedEvent:
+			log.Println("directory removed: ", *eventBody.Path)
+
+		case types.FileRemovedEvent:
+			log.Println("file removed: ", *eventBody.Path)
+
+		case types.DirectoryRenamedEvent:
+			log.Println("directory renamed: ", *eventBody.Path)
+
+		case types.FileRenamedEvent:
+			log.Println("file renamed: ", *eventBody.Path)
+
+		case types.DirectoryMovedEvent:
+			log.Printf("directory moved from %s to %s: ", *eventBody.OldPath, *eventBody.Path)
+
+		case types.FileMovedEvent:
+			log.Printf("file moved from %s to %s: ", *eventBody.OldPath, *eventBody.Path)
 		}
 
 	}

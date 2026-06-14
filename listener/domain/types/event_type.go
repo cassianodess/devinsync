@@ -9,11 +9,11 @@ const (
 	FileMovedEvent   EventType = "FILE_MOVED"
 	FileRenamedEvent EventType = "FILE_RENAMED"
 
-	DirectoryCreatedEvent EventType = "FILE_CREATED"
-	DirectoryWritedEvent  EventType = "FILE_WRITED"
-	DirectoryRemovedEvent EventType = "FILE_REMOVED"
-	DirectoryMovedEvent   EventType = "FILE_MOVED"
-	DirectoryRenamedEvent EventType = "FILE_RENAMED"
+	DirectoryCreatedEvent EventType = "DIRECTORY_CREATED"
+	DirectoryWritedEvent  EventType = "DIRECTORY_WRITED"
+	DirectoryRemovedEvent EventType = "DIRECTORY_REMOVED"
+	DirectoryMovedEvent   EventType = "DIRECTORY_MOVED"
+	DirectoryRenamedEvent EventType = "DIRECTORY_RENAMED"
 
 	SnapshotCreateEvent   EventType = "SNAPSHOT_CREATE"
 	SnapshotSyncEvent     EventType = "SNAPSHOT_SYNC"
