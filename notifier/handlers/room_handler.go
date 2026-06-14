@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/gofiber/contrib/v3/websocket"
+	"github.com/google/uuid"
 )
 
 type RoomHandler struct {
@@ -19,8 +20,7 @@ func NewRoomHandler(hub *entities.Hub) *RoomHandler {
 }
 
 func (this *RoomHandler) HostRoom(ctx *websocket.Conn) {
-	//roomID := strings.TrimSpace(strings.ToLower(uuid.New().String()))
-	roomID := "123"
+	roomID := strings.TrimSpace(strings.ToLower(uuid.New().String()))
 	log.Printf("[%s] Criou a sala id: [%s]", ctx.Conn.LocalAddr().String(), roomID)
 
 	client := &entities.Client{
