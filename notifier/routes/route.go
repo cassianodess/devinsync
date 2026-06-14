@@ -23,7 +23,6 @@ func Init(app *fiber.App) {
 
 	roomHandler := handlers.NewRoomHandler(hub)
 	roomGroup := globalGroup.Group("/room")
-	roomGroup.Get("/", websocket.New(roomHandler.Create))
-	roomGroup.Get("/join/:id", websocket.New(roomHandler.Join))
+	roomGroup.Get("/:id", websocket.New(roomHandler.ConnectRoom))
 
 }

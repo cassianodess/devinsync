@@ -3,7 +3,6 @@ package handlers
 import (
 	"devinsync/domain/entities"
 	"log"
-	"time"
 
 	"github.com/gofiber/contrib/v3/websocket"
 )
@@ -18,33 +17,9 @@ func NewRoomHandler(hub *entities.Hub) *RoomHandler {
 	}
 }
 
-func (this *RoomHandler) Create(ctx *websocket.Conn) {
-	log.Println(ctx.Locals("allowed"))
-
-	for {
-
-		if _, _, err := ctx.ReadMessage(); err != nil {
-			log.Println("read error: ", err)
-			break
-		}
-
-		body := map[string]string{
-			"Hello": "Olá",
-			"World": "Mundo",
-		}
-
-		if err := ctx.WriteJSON(body); err != nil {
-			log.Println("write json error: ", err)
-		}
-
-	}
-
-}
-
-func (this *RoomHandler) Join(ctx *websocket.Conn) {
-	log.Println("Entrou no join")
+func (this *RoomHandler) ConnectRoom(ctx *websocket.Conn) {
 	roomID := ctx.Params("id")
-
+	log.Printf("[%s] Entrou na sala [%s]", ctx.Conn.LocalAddr().String(), roomID)
 
 	client := &entities.Client{
 		Conn:   ctx,
@@ -55,22 +30,12 @@ func (this *RoomHandler) Join(ctx *websocket.Conn) {
 	defer this.hub.UnRegister(roomID, client)
 
 	for {
-		var message []byte
-		var err error
-		if _, message, err = ctx.ReadMessage(); err != nil {
+		var eventBody *entities.Event = &entities.Event{}
+		if err := ctx.ReadJSON(eventBody); err != nil {
 			break
 		}
 
-		path := "./Desktop/text.txt"
-		content := string(message)
-		now := time.Now().UTC()
-		event := entities.Event{
-			Type:      entities.FileCreatedEvent,
-			Path:      &path,
-			Content:   &content,
-			CreatedAt: &now,
-		}
+		this.hub.Broadcast(roomID, eventBody)
 
-		this.hub.Broadcast(roomID, event)
 	}
 }
