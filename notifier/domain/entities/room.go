@@ -1,7 +1,10 @@
 package entities
 
 import (
+	"devinsync/domain/types"
+	"log"
 	"sync"
+	"time"
 )
 
 type Hub struct {
@@ -20,16 +23,42 @@ func (this *Hub) Register(roomID string, client *Client) {
 	defer this.mutex.Unlock()
 
 	if this.clients[roomID] == nil {
+		if !client.IsHost {
+			log.Println("only host can create rooms")
+			client.Conn.Close()
+			return
+		}
 		this.clients[roomID] = make(map[*Client]bool)
 	}
 
 	this.clients[roomID][client] = true
+
+	if client.IsHost {
+		roomCreatedEvent := &Event{
+			Type:      types.RoomCreatedEvent,
+			Content:   []byte(roomID),
+			CreatedAt: time.Now().UTC(),
+		}
+		if err := client.Conn.WriteJSON(roomCreatedEvent); err != nil {
+			log.Println("error while write room created")
+		}
+	} else {
+		snapshotEvent := &Event{
+			Type:      types.SnapshotEvent,
+			Content:   []byte(nil),
+			CreatedAt: time.Now().UTC(),
+		}
+		this.SendToHost(roomID, snapshotEvent)
+	}
 }
 
 func (this *Hub) UnRegister(roomID string, client *Client) {
 	this.mutex.Lock()
 	defer this.mutex.Unlock()
 
+	if client.IsHost {
+		log.Printf("host [%s] has leafted room [%s]", client.Conn.LocalAddr().String(), roomID)
+	}
 	if clients, ok := this.clients[roomID]; ok {
 		delete(clients, client)
 
@@ -47,5 +76,18 @@ func (this *Hub) Broadcast(roomID string, payload any) {
 
 	for client := range clients {
 		client.Conn.WriteJSON(payload)
+	}
+}
+
+func (this *Hub) SendToHost(roomID string, payload any) {
+	this.mutex.RLock()
+	defer this.mutex.RUnlock()
+
+	clients := this.clients[roomID]
+
+	for client := range clients {
+		if client.IsHost {
+			client.Conn.WriteJSON(payload)
+		}
 	}
 }

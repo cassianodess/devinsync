@@ -8,6 +8,7 @@ import (
 type Event struct {
 	Type      types.EventType `json:"type"`
 	Path      *string         `json:"path"`
-	Content   *string         `json:"content"`
-	CreatedAt *time.Time      `json:"created_at"`
+	OldPath   *string         `json:"old_path,omitempty"`
+	Content   []byte          `json:"content,omitempty"`
+	CreatedAt time.Time       `json:"created_at"`
 }

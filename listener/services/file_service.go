@@ -6,13 +6,8 @@ import (
 	"os"
 )
 
+func CheckFiles(filePath string) {
 
-func CheckFiles() {
-	if len(os.Args) < 2 {
-		log.Fatalf("You must pass an path argument")
-	}
-
-	filePath := os.Args[1]
 	if _, err := os.ReadDir(filePath); err != nil {
 		log.Fatalf("Failed to read directory: %v", err)
 	} else {

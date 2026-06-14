@@ -7,4 +7,5 @@ import (
 type Client struct {
 	Conn   *websocket.Conn
 	RoomID string
+	IsHost bool
 }

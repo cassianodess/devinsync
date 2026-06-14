@@ -2,9 +2,12 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"listener/domain/entities"
+	"listener/domain/types"
 	"listener/services"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/radovskyb/watcher"
@@ -12,15 +15,37 @@ import (
 
 func main() {
 
-	userPath := flag.String("path", "", "./path/to/dir")
+	target := flag.String("target", "", "[host|guest]")
+	roomID := flag.String("room", "", "room_id")
+	workspace := flag.String("path", "", "./path/to/dir")
 	flag.Parse()
-	if *userPath == "" {
-		log.Fatal("missing required flag: -path")
+
+	if strings.ToLower(strings.TrimSpace(*target)) != string(types.TargetHost) && strings.ToLower(strings.TrimSpace(*target)) != string(types.TargetGuest) {
+		flag.Usage()
+		log.Fatal("invalid target [host|guest]")
+	}
+
+	var isHost bool = strings.ToLower(strings.TrimSpace(*target)) == string(types.TargetHost)
+
+	if isHost && *workspace == "" {
+		flag.Usage()
+		log.Fatal("missing path")
 	}
 
 	w := watcher.New()
+	var baseURL string = "ws://localhost:8080/ws"
+	var targetURL string = "host"
 
-	wsConnection, wsConnectionErr := entities.NewConnector("ws://localhost:8080/ws/room/123")
+	if !isHost {
+		if strings.ToLower(strings.TrimSpace(*roomID)) == "" {
+			flag.Usage()
+			log.Fatal("missing flag room")
+		}
+
+		targetURL = fmt.Sprintf("join/%s", strings.TrimSpace(strings.ToLower(*roomID)))
+	}
+
+	wsConnection, wsConnectionErr := entities.NewConnector(fmt.Sprintf("%s/%s", baseURL, targetURL))
 	if wsConnectionErr != nil {
 		log.Fatal("error while conenction to server: ", wsConnectionErr)
 	}
@@ -28,9 +53,13 @@ func main() {
 	go ListenServer(wsConnection)
 	go ListenChanges(w, wsConnection)
 
-	services.CheckFiles()
+	//if !isHost {
+	//	*workspace = fmt.Sprintf("$HOME/.devinsync/%s", *roomID)
+	//}
 
-	if err := w.AddRecursive(*userPath); err != nil {
+	services.CheckFiles(*workspace)
+
+	if err := w.AddRecursive(*workspace); err != nil {
 		log.Fatalln(err)
 	}
 
@@ -44,10 +73,10 @@ func ListenServer(wsConnection *entities.Connector) {
 
 		var eventBody *entities.Event = &entities.Event{}
 		if err := wsConnection.Connection.ReadJSON(eventBody); err != nil {
-			break
+			log.Fatal("connection failed: ", err)
 		}
 
-		log.Printf("event received:\nevent=<%s>\ncontent=<%s>\npath=<%s>\ncreated_at=<%s>", eventBody.Type, string(*eventBody.Content), string(*eventBody.Path), eventBody.CreatedAt)
+		log.Printf("event received:\nevent=<%s>\ncontent=<%s>\npath=<%s>\ncreated_at=<%s>", eventBody.Type, string(eventBody.Content), eventBody.Path, eventBody.CreatedAt)
 
 	}
 
