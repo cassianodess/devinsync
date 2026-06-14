@@ -15,7 +15,8 @@ const (
 	DirectoryMovedEvent   EventType = "FILE_MOVED"
 	DirectoryRenamedEvent EventType = "FILE_RENAMED"
 
-	SnapshotEvent         EventType = "SNAPSHOT"
+	SnapshotCreateEvent   EventType = "SNAPSHOT_CREATE"
+	SnapshotSyncEvent     EventType = "SNAPSHOT_SYNC"
 	HostDisconnectedEvent EventType = "HOST_DISCONNECTED"
 	RoomCreatedEvent      EventType = "ROOM_CREATED"
 )

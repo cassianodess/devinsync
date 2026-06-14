@@ -7,6 +7,7 @@ import (
 	"listener/domain/types"
 	"listener/services"
 	"log"
+	"os"
 	"strings"
 	"time"
 
@@ -33,6 +34,14 @@ func main() {
 	}
 
 	w := watcher.New()
+
+	//ignored := services.GetIgnoredFiled()
+	//if err := w.Ignore(ignored...); err != nil {
+	//	log.Fatal("error while ignoring files in .disignore")
+	//}
+	//TODO: verify by .disignore
+	w.IgnoreHiddenFiles(true)
+
 	var baseURL string = "ws://localhost:8080/ws"
 	var targetURL string = "host"
 
@@ -50,24 +59,18 @@ func main() {
 		log.Fatal("error while conenction to server: ", wsConnectionErr)
 	}
 
-	go ListenServer(wsConnection)
+	go ListenServer(wsConnection, w)
 	go ListenChanges(w, wsConnection)
 
-	//if !isHost {
-	//	*workspace = fmt.Sprintf("$HOME/.devinsync/%s", *roomID)
-	//}
+	if isHost {
+		_, err := services.CheckFiles(*workspace)
+		if err != nil {
+			log.Fatal("error while finding directories")
+		}
 
-	entries, err := services.CheckFiles(*workspace)
-	if err != nil {
-		log.Fatal("error while finding directories")
-	}
-
-	for _, entry := range entries {
-		fmt.Println("entry: ", entry)
-	}
-
-	if err := w.AddRecursive(*workspace); err != nil {
-		log.Fatalln(err)
+		if err := w.AddRecursive(*workspace); err != nil {
+			log.Fatalln(err)
+		}
 	}
 
 	if err := w.Start(time.Millisecond * 500); err != nil {
@@ -75,7 +78,7 @@ func main() {
 	}
 }
 
-func ListenServer(wsConnection *entities.Connector) {
+func ListenServer(wsConnection *entities.Connector, w *watcher.Watcher) {
 	for {
 
 		var eventBody *entities.Event = &entities.Event{}
@@ -90,6 +93,34 @@ func ListenServer(wsConnection *entities.Connector) {
 
 		log.Printf("event received:\nevent=<%s>\ncontent=<%s>\npath=<%s>\ncreated_at=<%s>", eventBody.Type, string(eventBody.Content), path, eventBody.CreatedAt)
 
+		switch eventBody.Type {
+		case types.SnapshotCreateEvent:
+			fmt.Println("SnapshotCreateEvent")
+			eventMessage := &entities.Event{
+				Content:   []byte(nil),
+				Type:      types.SnapshotSyncEvent,
+				CreatedAt: time.Now().UTC(),
+			}
+			if err := wsConnection.SendMessage(eventMessage); err != nil {
+				log.Fatal("error while send SnapshotSyncEvent: ", err)
+			}
+		case types.SnapshotSyncEvent:
+			fmt.Println("SnapshotSyncEvent")
+			//CRIA O DIRETORIO BASE
+			homeDir, err := os.UserHomeDir()
+			if err != nil {
+				log.Fatal("error while getting home directory: ", err)
+			}
+
+			guestWorkspacePath := fmt.Sprintf("%s/.devinsync/123", homeDir)
+			if err := os.MkdirAll(guestWorkspacePath, 0775); err != nil {
+				log.Fatal("error while creating guest workspace: ", err)
+			}
+
+			//Cria os demais diretorios e arquivos
+
+		}
+
 	}
 
 }
@@ -98,7 +129,6 @@ func ListenChanges(w *watcher.Watcher, wsConnection *entities.Connector) {
 	for {
 		select {
 		case event := <-w.Event:
-
 			services.HandleEvent(event, wsConnection)
 		case err := <-w.Error:
 			log.Fatalln(err)

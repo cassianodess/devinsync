@@ -2,7 +2,9 @@ package services
 
 import (
 	"fmt"
+	"log"
 	"os"
+	"strings"
 )
 
 func CheckFiles(filePath string) ([]os.DirEntry, error) {
@@ -16,4 +18,15 @@ func GetFileContent(path string) string {
 	}
 
 	return string(contentBytes)
+}
+
+func GetIgnoredFiled() []string {
+	contentBytes, err := os.ReadFile("./.disignore")
+	if err != nil {
+		log.Fatal("error while read ignore files")
+	}
+
+	var ignoredFiles []string = strings.Split(strings.TrimSpace(string(contentBytes)), "\n")
+
+	return ignoredFiles
 }

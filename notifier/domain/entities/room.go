@@ -44,7 +44,7 @@ func (this *Hub) Register(roomID string, client *Client) {
 		}
 	} else {
 		snapshotEvent := &Event{
-			Type:      types.SnapshotEvent,
+			Type:      types.SnapshotCreateEvent,
 			Content:   []byte(nil),
 			CreatedAt: time.Now().UTC(),
 		}
