@@ -196,6 +196,8 @@ func ListenServer(wsConnection *entities.Connector, w *watcher.Watcher, roomID *
 				log.Fatalln(err)
 			}
 
+			log.Println("guest workspace setup successfully")
+
 		case types.DirectoryCreatedEvent:
 			log.Println("directory created event: ", *eventBody.Path)
 
