@@ -42,8 +42,6 @@ func main() {
 	//if err := w.Ignore(ignored...); err != nil {
 	//	log.Fatal("error while ignoring files in .disignore")
 	//}
-	//TODO: verify by .disignore
-	w.IgnoreHiddenFiles(true)
 
 	var baseURL string = os.Getenv("SERVER_URL")
 	var targetURL string = "host"
@@ -81,7 +79,7 @@ func main() {
 		os.Exit(0)
 	}()
 
-	go services.ListenServer(wsConnection, w, roomID)
+	go services.ListenServer(wsConnection, w)
 	go services.ListenChanges(w, wsConnection)
 
 	if isHost {

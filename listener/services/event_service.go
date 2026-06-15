@@ -2,7 +2,6 @@ package services
 
 import (
 	"encoding/json"
-	"fmt"
 	"listener/domain/constants"
 	"listener/domain/entities"
 	"listener/domain/types"
@@ -111,7 +110,7 @@ func HandleEvent(event watcher.Event, connection *entities.Connector) {
 	}
 }
 
-func ListenServer(wsConnection *entities.Connector, w *watcher.Watcher, roomID *string) {
+func ListenServer(wsConnection *entities.Connector, w *watcher.Watcher) {
 	for {
 
 		var eventBody *entities.Event = &entities.Event{}
@@ -162,31 +161,32 @@ func ListenServer(wsConnection *entities.Connector, w *watcher.Watcher, roomID *
 			if err := wsConnection.SendMessage(eventMessage); err != nil {
 				log.Fatal("error while send SnapshotSyncEvent: ", err)
 			}
+
 		case types.SnapshotSyncEvent:
 			homeDir, err := os.UserHomeDir()
 			if err != nil {
 				log.Fatal("error while getting home directory: ", err)
 			}
 
-			guestWorkspacePath := fmt.Sprintf("%s/%s/%s", homeDir, constants.GUEST_WORKSPACE, *roomID)
+			guestWorkspacePath := filepath.Join(homeDir, constants.GUEST_WORKSPACE)
 			if err := os.MkdirAll(guestWorkspacePath, 0775); err != nil {
 				log.Fatal("error while creating guest workspace: ", err)
 			}
 
 			var contentJson []entities.SnapshotSyncContent = []entities.SnapshotSyncContent{}
-
 			if err := json.Unmarshal(eventBody.Content, &contentJson); err != nil {
 				log.Fatalln("error while unmarshal content json: ", err)
 			}
 
 			for _, snapshot := range contentJson {
-				snapshotPath := fmt.Sprintf("%s/%s", guestWorkspacePath, snapshot.DirectoryPath)
+				snapshotPath := filepath.Join(guestWorkspacePath, snapshot.DirectoryPath)
 				if err := os.MkdirAll(snapshotPath, 0775); err != nil {
 					log.Fatal("error while creating guest workspace: ", err)
 				}
 
+				cleanedFilePath := filepath.Join(guestWorkspacePath, snapshot.DirectoryPath, snapshot.FileName)
 				currentFile, err := os.Create(
-					fmt.Sprintf("%s/%s/%s", guestWorkspacePath, snapshot.DirectoryPath, snapshot.FileName),
+					cleanedFilePath,
 				)
 				if err != nil {
 					log.Println("error while creating guest workspace files: ", err)
@@ -205,7 +205,7 @@ func ListenServer(wsConnection *entities.Connector, w *watcher.Watcher, roomID *
 				log.Fatalln(err)
 			}
 
-			log.Println("guest workspace setup successfully")
+			showInstructions(guestWorkspacePath)
 
 		case types.DirectoryCreatedEvent:
 			log.Println("directory created event: ", *eventBody.Path)
@@ -261,10 +261,23 @@ func CleanUpWorkspace() {
 		log.Println("error while getting home dir: ", err)
 	}
 
-	guestWorkspacePath := fmt.Sprintf("%s/%s", homeDir, constants.GUEST_WORKSPACE)
+	guestWorkspacePath := filepath.Join(homeDir, constants.GUEST_WORKSPACE)
 	if err := os.RemoveAll(guestWorkspacePath); err != nil {
 		log.Println("error while removing guest workspace: ", err)
 	}
 
 	log.Println("guest workspace deleted successfully: ", guestWorkspacePath)
+}
+
+func showInstructions(guestWorkspacePath string) {
+	log.Println()
+	log.Println("==================================")
+	log.Println("GUEST WORKSPACE SETUP SUCCESSFULLY")
+	log.Println("==================================")
+	log.Println()
+	log.Println(">>> FOLLOW THE INSTRUCTIONS TO OPEN THIS WORKSPACE <<<")
+	log.Println("> Open your terminal")
+	log.Printf("> Run [cd %s]", guestWorkspacePath)
+	log.Println("> Then open your text editor and start to editing")
+	log.Println("==================================")
 }
