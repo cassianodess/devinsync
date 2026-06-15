@@ -3,6 +3,7 @@ package services
 import (
 	"encoding/json"
 	"fmt"
+	"listener/domain/constants"
 	"listener/domain/entities"
 	"listener/domain/types"
 	"log"
@@ -167,7 +168,7 @@ func ListenServer(wsConnection *entities.Connector, w *watcher.Watcher, roomID *
 				log.Fatal("error while getting home directory: ", err)
 			}
 
-			guestWorkspacePath := fmt.Sprintf("%s/.devinsync/%s", homeDir, *roomID)
+			guestWorkspacePath := fmt.Sprintf("%s/%s/%s", homeDir, constants.GUEST_WORKSPACE, *roomID)
 			if err := os.MkdirAll(guestWorkspacePath, 0775); err != nil {
 				log.Fatal("error while creating guest workspace: ", err)
 			}
@@ -260,7 +261,7 @@ func CleanUpWorkspace() {
 		log.Println("error while getting home dir: ", err)
 	}
 
-	guestWorkspacePath := fmt.Sprintf("%s/.devinsync", homeDir)
+	guestWorkspacePath := fmt.Sprintf("%s/%s", homeDir, constants.GUEST_WORKSPACE)
 	if err := os.RemoveAll(guestWorkspacePath); err != nil {
 		log.Println("error while removing guest workspace: ", err)
 	}
