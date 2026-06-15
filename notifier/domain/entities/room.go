@@ -58,7 +58,21 @@ func (this *Hub) UnRegister(roomID string, client *Client) {
 
 	if client.IsHost {
 		log.Printf("host [%s] has leafted room [%s]", client.Conn.LocalAddr().String(), roomID)
+
+		for guest := range this.clients[roomID] {
+			if guest.IsHost {
+				continue
+			}
+
+			event := &Event{
+				Type:      types.HostDisconnectedEvent,
+				CreatedAt: time.Now().UTC(),
+			}
+
+			guest.Conn.WriteJSON(event)
+		}
 	}
+
 	if clients, ok := this.clients[roomID]; ok {
 		delete(clients, client)
 

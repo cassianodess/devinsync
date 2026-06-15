@@ -9,7 +9,10 @@ import (
 	"listener/services"
 	"log"
 	"os"
+	"os/signal"
+	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/radovskyb/watcher"
@@ -22,19 +25,20 @@ func main() {
 	workspace := flag.String("path", "", "./path/to/dir")
 	flag.Parse()
 
-	if strings.ToLower(strings.TrimSpace(*target)) != string(types.TargetHost) && strings.ToLower(strings.TrimSpace(*target)) != string(types.TargetGuest) {
+	isInvalidTarget := strings.ToLower(strings.TrimSpace(*target)) != string(types.TargetHost) && strings.ToLower(strings.TrimSpace(*target)) != string(types.TargetGuest)
+	if isInvalidTarget {
 		flag.Usage()
 		log.Fatal("invalid target [host|guest]")
 	}
 
 	var isHost bool = strings.ToLower(strings.TrimSpace(*target)) == string(types.TargetHost)
-
 	if isHost && *workspace == "" {
 		flag.Usage()
 		log.Fatal("missing path")
 	}
 
 	w := watcher.New()
+	defer w.Close()
 
 	//ignored := services.GetIgnoredFiled()
 	//if err := w.Ignore(ignored...); err != nil {
@@ -59,6 +63,25 @@ func main() {
 	if wsConnectionErr != nil {
 		log.Fatal("error while conenction to server: ", wsConnectionErr)
 	}
+	defer wsConnection.Connection.Close()
+
+	signals := make(chan os.Signal, 1)
+	signal.Notify(
+		signals,
+		os.Interrupt,
+		syscall.SIGTERM,
+	)
+
+	go func() {
+		<-signals
+		log.Println("shutting down...")
+		if !isHost {
+			CleanUpWorkspace()
+		}
+		w.Close()
+		wsConnection.Connection.Close()
+		os.Exit(0)
+	}()
 
 	go ListenServer(wsConnection, w, roomID)
 	go ListenChanges(w, wsConnection)
@@ -84,7 +107,9 @@ func ListenServer(wsConnection *entities.Connector, w *watcher.Watcher, roomID *
 
 		var eventBody *entities.Event = &entities.Event{}
 		if err := wsConnection.Connection.ReadJSON(eventBody); err != nil {
-			log.Fatal("connection failed: ", err)
+			log.Println("connection failed: ", err)
+			CleanUpWorkspace()
+			return
 		}
 
 		log.Println("event received: ", eventBody.Type)
@@ -92,6 +117,11 @@ func ListenServer(wsConnection *entities.Connector, w *watcher.Watcher, roomID *
 		switch eventBody.Type {
 		case types.RoomCreatedEvent:
 			log.Printf("room has been created: [%s]\n", string(eventBody.Content))
+
+		case types.HostDisconnectedEvent:
+			log.Println("host has leaf the room")
+			CleanUpWorkspace()
+			return
 
 		case types.SnapshotCreateEvent:
 
@@ -102,13 +132,9 @@ func ListenServer(wsConnection *entities.Connector, w *watcher.Watcher, roomID *
 					continue
 				}
 
-				peaces := strings.Split(filePath, "/")
-				lastLength := (len(filePath) - len(peaces[len(peaces)-1]))
-				formatted := filePath[1 : lastLength-1]
-
 				content := entities.SnapshotSyncContent{
-					DirectoryPath: formatted,
-					FileName:      currentFile.Name(),
+					DirectoryPath: filepath.Dir(filePath),
+					FileName:      filepath.Base(filePath),
 					FileContet:    services.GetFileContent(filePath),
 				}
 				contentJson = append(contentJson, content)
@@ -154,11 +180,15 @@ func ListenServer(wsConnection *entities.Connector, w *watcher.Watcher, roomID *
 					fmt.Sprintf("%s/%s/%s", guestWorkspacePath, snapshot.DirectoryPath, snapshot.FileName),
 				)
 				if err != nil {
-					log.Fatal("error while creating guest workspace files: ", err)
+					log.Println("error while creating guest workspace files: ", err)
+					continue
 				}
 				if _, err := currentFile.Write(snapshot.FileContet); err != nil {
-					log.Fatalln("error while write file: ", err)
+					currentFile.Close()
+					log.Println("error while write file: ", err)
+					continue
 				}
+				currentFile.Close()
 
 			}
 
@@ -212,4 +242,18 @@ func ListenChanges(w *watcher.Watcher, wsConnection *entities.Connector) {
 			return
 		}
 	}
+}
+
+func CleanUpWorkspace() {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		log.Println("error while getting home dir: ", err)
+	}
+
+	guestWorkspacePath := fmt.Sprintf("%s/.devinsync", homeDir)
+	if err := os.RemoveAll(guestWorkspacePath); err != nil {
+		log.Println("error while removing guest workspace: ", err)
+	}
+
+	log.Println("guest workspace deleted successfully: ", guestWorkspacePath)
 }
