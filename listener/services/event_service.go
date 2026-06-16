@@ -13,7 +13,7 @@ import (
 )
 
 func HandleEvent(event watcher.Event, connection *entities.Connector, isHost bool, syncManager *entities.SyncManager) {
-	if syncManager.ShouldIgnore(event.Path) {
+	if syncManager.ShouldIgnore(*GetParsedPath(event.Path, isHost)) {
 		return
 	}
 
@@ -216,7 +216,7 @@ func ListenServer(wsConnection *entities.Connector, w *watcher.Watcher, isHost b
 			log.Println("directory writed: ", *eventBody.Path)
 
 		case types.FileWritedEvent:
-			syncManager.Ignore(*eventBody.Path)
+			syncManager.Ignore(*GetParsedPath(*eventBody.Path, isHost))
 
 			if !isHost {
 				*eventBody.Path = filepath.Join(*GetGuestWorkspacePath(), *eventBody.Path)
