@@ -127,7 +127,19 @@ func ListenServer(wsConnection *entities.Connector, w *watcher.Watcher, isHost b
 			return
 		}
 
-		log.Println("event received: ", eventBody.Type)
+		filePath := "N/A"
+		if eventBody.Path != nil {
+			filePath = *eventBody.Path
+		}
+
+		oldPath := "N/A"
+		if eventBody.OldPath != nil {
+			oldPath = *eventBody.OldPath
+		}
+
+		log.Printf("event received: %s", eventBody.Type)
+		log.Printf("Path: %s", filePath)
+		log.Printf("OldPath: %s", oldPath)
 
 		switch eventBody.Type {
 		case types.RoomCreatedEvent:
@@ -139,7 +151,6 @@ func ListenServer(wsConnection *entities.Connector, w *watcher.Watcher, isHost b
 			return
 
 		case types.SnapshotCreateEvent:
-
 			var contentJson []entities.SnapshotSyncContent = []entities.SnapshotSyncContent{}
 
 			for filePath, currentFile := range w.WatchedFiles() {
@@ -179,8 +190,9 @@ func ListenServer(wsConnection *entities.Connector, w *watcher.Watcher, isHost b
 
 			for _, snapshot := range contentJson {
 				snapshotPath := filepath.Join(guestWorkspacePath, snapshot.DirectoryPath)
-				if err := os.MkdirAll(snapshotPath, 0775); err != nil {
+				if err := CreateDirectory(snapshotPath); err != nil {
 					log.Fatal("error while creating guest workspace: ", err)
+					return
 				}
 
 				cleanedFilePath := filepath.Join(guestWorkspacePath, snapshot.DirectoryPath, snapshot.FileName)
@@ -207,46 +219,80 @@ func ListenServer(wsConnection *entities.Connector, w *watcher.Watcher, isHost b
 			ShowInstructions(guestWorkspacePath)
 
 		case types.DirectoryCreatedEvent:
-			log.Println("directory created event: ", *eventBody.Path)
-
-		case types.FileCreatedEvent:
-			log.Println("file created event: ", *eventBody.Path)
-
-		case types.DirectoryWritedEvent:
-			log.Println("directory writed: ", *eventBody.Path)
-
-		case types.FileWritedEvent:
 			syncManager.Ignore(*GetParsedPath(*eventBody.Path, isHost))
 
 			if !isHost {
 				*eventBody.Path = filepath.Join(*GetGuestWorkspacePath(), *eventBody.Path)
 			}
 
-			log.Println("file writed: ", *eventBody.Path)
-
-			if err := os.WriteFile(*eventBody.Path, eventBody.Content, 0644); err != nil {
-				log.Println("error while writing file", err)
+			if err := CreateDirectory(*eventBody.Path); err != nil {
+				log.Println("error while create folder", err)
+				continue
 			}
 
-		case types.DirectoryRemovedEvent:
-			log.Println("directory removed: ", *eventBody.Path)
+			log.Println("directory created event: ", *eventBody.Path)
 
-		case types.FileRemovedEvent:
-			log.Println("file removed: ", *eventBody.Path)
+		case types.FileWritedEvent, types.FileCreatedEvent:
+			syncManager.Ignore(*GetParsedPath(*eventBody.Path, isHost))
 
-		case types.DirectoryRenamedEvent:
-			log.Println("directory renamed: ", *eventBody.Path)
+			if !isHost {
+				*eventBody.Path = filepath.Join(*GetGuestWorkspacePath(), *eventBody.Path)
+			}
 
-		case types.FileRenamedEvent:
-			log.Println("file renamed: ", *eventBody.Path)
+			if err := CreateFile(*eventBody.Path, eventBody.Content); err != nil {
+				log.Println("error while write/create file", err)
+				continue
+			}
 
-		case types.DirectoryMovedEvent:
-			log.Printf("directory moved from %s to %s: ", *eventBody.OldPath, *eventBody.Path)
+			log.Println("file writed/created: ", *eventBody.Path)
 
-		case types.FileMovedEvent:
-			log.Printf("file moved from %s to %s: ", *eventBody.OldPath, *eventBody.Path)
+		case types.DirectoryRemovedEvent, types.FileRemovedEvent:
+			syncManager.Ignore(*GetParsedPath(*eventBody.Path, isHost))
+			if !isHost {
+				*eventBody.Path = filepath.Join(*GetGuestWorkspacePath(), *eventBody.Path)
+			}
+
+			if err := DeleteDirectoryOrFile(*eventBody.Path); err != nil {
+				log.Println("error while delete directory/file", err)
+				continue
+			}
+
+			log.Println("directory deleted: ", *eventBody.Path)
+
+		case types.DirectoryMovedEvent, types.DirectoryRenamedEvent:
+			syncManager.Ignore(*GetParsedPath(*eventBody.Path, isHost))
+			syncManager.Ignore(*GetParsedPath(*eventBody.OldPath, isHost))
+			if !isHost {
+				*eventBody.Path = filepath.Join(*GetGuestWorkspacePath(), *eventBody.Path)
+				*eventBody.OldPath = filepath.Join(*GetGuestWorkspacePath(), *eventBody.OldPath)
+			}
+
+			log.Println("old: ", *eventBody.OldPath)
+			log.Println("new: ", *eventBody.Path)
+
+			if err := RenameOrMoveDirectoryOrFile(*eventBody.OldPath, *eventBody.Path); err != nil {
+				log.Println("error while move/rename directory", err)
+				continue
+			}
+
+			log.Printf("directory moved/renamed: from %s to %s", *eventBody.OldPath, *eventBody.Path)
+
+		case types.FileMovedEvent, types.FileRenamedEvent:
+			syncManager.Ignore(*GetParsedPath(*eventBody.Path, isHost))
+			if !isHost {
+				*eventBody.Path = filepath.Join(*GetGuestWorkspacePath(), *eventBody.Path)
+				*eventBody.OldPath = filepath.Join(*GetGuestWorkspacePath(), *eventBody.OldPath)
+			}
+
+			if err := RenameOrMoveDirectoryOrFile(*eventBody.OldPath, *eventBody.Path); err != nil {
+				log.Println("error while move/rename file", err)
+				continue
+			}
+
+			log.Printf("file moved/renamed: from %s to %s", *eventBody.OldPath, *eventBody.Path)
 		}
 
+		log.Println()
 	}
 
 }
@@ -275,13 +321,13 @@ func CleanUpWorkspace() {
 
 func ShowInstructions(path string) {
 	log.Println()
-	log.Println("==================================")
+	log.Println("**********************************")
 	log.Println("WORKSPACE SETUP SUCCESSFULLY")
-	log.Println("==================================")
+	log.Println("**********************************")
 	log.Println()
 	log.Println(">>> FOLLOW THE INSTRUCTIONS TO OPEN THIS WORKSPACE <<<")
 	log.Println("> Open your terminal")
 	log.Printf("> Open your text editor in [cd %s]", path)
 	log.Println("> And then start to editing")
-	log.Println("==================================")
+	log.Println()
 }

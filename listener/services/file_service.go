@@ -63,3 +63,19 @@ func GetGuestWorkspacePath() *string {
 	return &guestWorkspacePath
 
 }
+
+func CreateDirectory(path string) error {
+	return os.MkdirAll(path, 0775)
+}
+
+func CreateFile(path string, content []byte) error {
+	return os.WriteFile(path, content, 0644)
+}
+
+func DeleteDirectoryOrFile(path string) error {
+	return os.RemoveAll(path)
+}
+
+func RenameOrMoveDirectoryOrFile(oldPath string, newPath string) error {
+	return os.Rename(oldPath, newPath)
+}
