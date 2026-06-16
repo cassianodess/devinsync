@@ -37,17 +37,29 @@ func GetIgnoredFiled() []string {
 	return ignoredFiles
 }
 
-func GetParsedPath(path string) string {
+func GetParsedPath(path string, isHost bool) *string {
+	if strings.TrimSpace(path) == "" {
+		return nil
+	}
+
+	if isHost {
+		return &path
+	}
+
+	guestWorkspacePath := GetGuestWorkspacePath()
+	replacer := strings.NewReplacer(*guestWorkspacePath, "")
+	source := replacer.Replace(path)
+	return &source
+}
+
+func GetGuestWorkspacePath() *string {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
-		log.Fatal("error while getting home directory: ", err)
+		log.Println("error while getting home directory: ", err)
+		return nil
 	}
 
 	guestWorkspacePath := filepath.Join(homeDir, constants.GUEST_WORKSPACE)
-	if err := os.MkdirAll(guestWorkspacePath, 0775); err != nil {
-		log.Fatal("error while creating guest workspace: ", err)
-	}
+	return &guestWorkspacePath
 
-	replacer := strings.NewReplacer(guestWorkspacePath, "")
-	return replacer.Replace(path)
 }

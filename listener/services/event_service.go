@@ -2,13 +2,11 @@ package services
 
 import (
 	"encoding/json"
-	"listener/domain/constants"
 	"listener/domain/entities"
 	"listener/domain/types"
 	"log"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/radovskyb/watcher"
@@ -33,9 +31,10 @@ func HandleEvent(event watcher.Event, connection *entities.Connector, isHost boo
 	isDirectoryMoved := (watcher.Move == event.Op) && event.IsDir()
 	isFileMoved := (watcher.Move == event.Op) && !event.IsDir()
 
-	var path *string = GetDestinationPath(event.Path, isHost)
-	var oldPath *string = GetDestinationPath(event.OldPath, isHost)
+	var path *string = GetParsedPath(event.Path, isHost)
+	var oldPath *string = GetParsedPath(event.OldPath, isHost)
 	var content []byte = nil
+
 	if !event.IsDir() {
 		content = GetFileContent(event.Path)
 	}
@@ -118,7 +117,7 @@ func HandleEvent(event watcher.Event, connection *entities.Connector, isHost boo
 	}
 }
 
-func ListenServer(wsConnection *entities.Connector, w *watcher.Watcher, syncManager *entities.SyncManager) {
+func ListenServer(wsConnection *entities.Connector, w *watcher.Watcher, isHost bool, syncManager *entities.SyncManager) {
 	for {
 
 		var eventBody *entities.Event = &entities.Event{}
@@ -171,15 +170,7 @@ func ListenServer(wsConnection *entities.Connector, w *watcher.Watcher, syncMana
 			}
 
 		case types.SnapshotSyncEvent:
-			homeDir, err := os.UserHomeDir()
-			if err != nil {
-				log.Fatal("error while getting home directory: ", err)
-			}
-
-			guestWorkspacePath := filepath.Join(homeDir, constants.GUEST_WORKSPACE)
-			if err := os.MkdirAll(guestWorkspacePath, 0775); err != nil {
-				log.Fatal("error while creating guest workspace: ", err)
-			}
+			guestWorkspacePath := *GetGuestWorkspacePath()
 
 			var contentJson []entities.SnapshotSyncContent = []entities.SnapshotSyncContent{}
 			if err := json.Unmarshal(eventBody.Content, &contentJson); err != nil {
@@ -213,7 +204,7 @@ func ListenServer(wsConnection *entities.Connector, w *watcher.Watcher, syncMana
 				log.Fatalln(err)
 			}
 
-			showInstructions(guestWorkspacePath)
+			ShowInstructions(guestWorkspacePath)
 
 		case types.DirectoryCreatedEvent:
 			log.Println("directory created event: ", *eventBody.Path)
@@ -226,7 +217,13 @@ func ListenServer(wsConnection *entities.Connector, w *watcher.Watcher, syncMana
 
 		case types.FileWritedEvent:
 			syncManager.Ignore(*eventBody.Path)
+
+			if !isHost {
+				*eventBody.Path = filepath.Join(*GetGuestWorkspacePath(), *eventBody.Path)
+			}
+
 			log.Println("file writed: ", *eventBody.Path)
+
 			if err := os.WriteFile(*eventBody.Path, eventBody.Content, 0644); err != nil {
 				log.Println("error while writing file", err)
 			}
@@ -268,12 +265,7 @@ func ListenChanges(w *watcher.Watcher, wsConnection *entities.Connector, isHost 
 }
 
 func CleanUpWorkspace() {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		log.Println("error while getting home dir: ", err)
-	}
-
-	guestWorkspacePath := filepath.Join(homeDir, constants.GUEST_WORKSPACE)
+	guestWorkspacePath := *GetGuestWorkspacePath()
 	if err := os.RemoveAll(guestWorkspacePath); err != nil {
 		log.Println("error while removing guest workspace: ", err)
 	}
@@ -281,38 +273,15 @@ func CleanUpWorkspace() {
 	log.Println("guest workspace deleted successfully: ", guestWorkspacePath)
 }
 
-func showInstructions(guestWorkspacePath string) {
+func ShowInstructions(path string) {
 	log.Println()
 	log.Println("==================================")
-	log.Println("GUEST WORKSPACE SETUP SUCCESSFULLY")
+	log.Println("WORKSPACE SETUP SUCCESSFULLY")
 	log.Println("==================================")
 	log.Println()
 	log.Println(">>> FOLLOW THE INSTRUCTIONS TO OPEN THIS WORKSPACE <<<")
 	log.Println("> Open your terminal")
-	log.Printf("> Run [cd %s]", guestWorkspacePath)
-	log.Println("> Then open your text editor and start to editing")
+	log.Printf("> Open your text editor in [cd %s]", path)
+	log.Println("> And then start to editing")
 	log.Println("==================================")
-}
-
-func GetDestinationPath(path string, isHost bool) *string {
-	if len(strings.TrimSpace(path)) == 0 {
-		return nil
-	}
-
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		log.Println("error while getting home directory: ", err)
-		return nil
-	}
-
-	destinationPath := path
-	guestWorkspacePath := filepath.Join(homeDir, constants.GUEST_WORKSPACE)
-
-	if isHost {
-		destinationPath = filepath.Join(guestWorkspacePath, destinationPath)
-	} else {
-		destinationPath = strings.TrimPrefix(destinationPath, guestWorkspacePath)
-	}
-
-	return &destinationPath
 }

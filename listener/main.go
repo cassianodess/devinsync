@@ -80,7 +80,7 @@ func main() {
 	}()
 
 	syncManager := entities.NewSyncManager()
-	go services.ListenServer(wsConnection, w, syncManager)
+	go services.ListenServer(wsConnection, w, isHost, syncManager)
 	go services.ListenChanges(w, wsConnection, isHost, syncManager)
 
 	if isHost {
@@ -92,6 +92,7 @@ func main() {
 		if err := w.AddRecursive(*workspace); err != nil {
 			log.Fatalln(err)
 		}
+		services.ShowInstructions(*workspace)
 	}
 
 	if err := w.Start(time.Millisecond * 500); err != nil {
