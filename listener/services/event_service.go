@@ -14,7 +14,11 @@ import (
 	"github.com/radovskyb/watcher"
 )
 
-func HandleEvent(event watcher.Event, connection *entities.Connector, isHost bool) {
+func HandleEvent(event watcher.Event, connection *entities.Connector, isHost bool, syncManager *entities.SyncManager) {
+	if syncManager.ShouldIgnore(event.Path) {
+		return
+	}
+
 	var eventMessage *entities.Event = nil
 
 	now := time.Now().UTC()
@@ -114,7 +118,7 @@ func HandleEvent(event watcher.Event, connection *entities.Connector, isHost boo
 	}
 }
 
-func ListenServer(wsConnection *entities.Connector, w *watcher.Watcher) {
+func ListenServer(wsConnection *entities.Connector, w *watcher.Watcher, syncManager *entities.SyncManager) {
 	for {
 
 		var eventBody *entities.Event = &entities.Event{}
@@ -221,7 +225,11 @@ func ListenServer(wsConnection *entities.Connector, w *watcher.Watcher) {
 			log.Println("directory writed: ", *eventBody.Path)
 
 		case types.FileWritedEvent:
+			syncManager.Ignore(*eventBody.Path)
 			log.Println("file writed: ", *eventBody.Path)
+			if err := os.WriteFile(*eventBody.Path, eventBody.Content, 0644); err != nil {
+				log.Println("error while writing file", err)
+			}
 
 		case types.DirectoryRemovedEvent:
 			log.Println("directory removed: ", *eventBody.Path)
@@ -246,11 +254,11 @@ func ListenServer(wsConnection *entities.Connector, w *watcher.Watcher) {
 
 }
 
-func ListenChanges(w *watcher.Watcher, wsConnection *entities.Connector, isHost bool) {
+func ListenChanges(w *watcher.Watcher, wsConnection *entities.Connector, isHost bool, syncManager *entities.SyncManager) {
 	for {
 		select {
 		case event := <-w.Event:
-			HandleEvent(event, wsConnection, isHost)
+			HandleEvent(event, wsConnection, isHost, syncManager)
 		case err := <-w.Error:
 			log.Fatalln(err)
 		case <-w.Closed:

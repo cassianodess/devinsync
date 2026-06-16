@@ -79,8 +79,9 @@ func main() {
 		os.Exit(0)
 	}()
 
-	go services.ListenServer(wsConnection, w)
-	go services.ListenChanges(w, wsConnection, isHost)
+	syncManager := entities.NewSyncManager()
+	go services.ListenServer(wsConnection, w, syncManager)
+	go services.ListenChanges(w, wsConnection, isHost, syncManager)
 
 	if isHost {
 		_, err := services.CheckFiles(*workspace)
