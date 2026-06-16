@@ -80,7 +80,7 @@ func main() {
 	}()
 
 	go services.ListenServer(wsConnection, w)
-	go services.ListenChanges(w, wsConnection)
+	go services.ListenChanges(w, wsConnection, isHost)
 
 	if isHost {
 		_, err := services.CheckFiles(*workspace)

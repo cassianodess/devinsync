@@ -8,12 +8,13 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/radovskyb/watcher"
 )
 
-func HandleEvent(event watcher.Event, connection *entities.Connector) {
+func HandleEvent(event watcher.Event, connection *entities.Connector, isHost bool) {
 	var eventMessage *entities.Event = nil
 
 	now := time.Now().UTC()
@@ -28,78 +29,81 @@ func HandleEvent(event watcher.Event, connection *entities.Connector) {
 	isDirectoryMoved := (watcher.Move == event.Op) && event.IsDir()
 	isFileMoved := (watcher.Move == event.Op) && !event.IsDir()
 
+	var path *string = GetDestinationPath(event.Path, isHost)
+	var oldPath *string = GetDestinationPath(event.OldPath, isHost)
+	var content []byte = nil
+	if !event.IsDir() {
+		content = GetFileContent(event.Path)
+	}
+
 	if isFolderCreated {
 		eventMessage = &entities.Event{
-			Path:      &event.Path,
-			Content:   nil,
+			Path:      path,
+			Content:   content,
 			Type:      types.DirectoryCreatedEvent,
 			CreatedAt: now,
 		}
 
 	} else if isFileCreated {
-		content := string(GetFileContent(event.Path))
 		eventMessage = &entities.Event{
-			Path:      &event.Path,
-			Content:   []byte(content),
+			Path:      path,
+			Content:   content,
 			Type:      types.FileCreatedEvent,
 			CreatedAt: now,
 		}
 
 	} else if isFileSaved {
-		content := string(GetFileContent(event.Path))
 		eventMessage = &entities.Event{
-			Path:      &event.Path,
-			Content:   []byte(content),
+			Path:      path,
+			Content:   content,
 			Type:      types.FileWritedEvent,
 			CreatedAt: now,
 		}
 	} else if isDirectoryRemoved {
 		eventMessage = &entities.Event{
-			Path:      &event.Path,
-			Content:   []byte(nil),
+			Path:      path,
+			Content:   content,
 			Type:      types.DirectoryRemovedEvent,
 			CreatedAt: now,
 		}
 	} else if isFileRemoved {
 		eventMessage = &entities.Event{
-			Path:      &event.Path,
-			Content:   []byte(nil),
+			Path:      path,
+			Content:   content,
 			Type:      types.FileRemovedEvent,
 			CreatedAt: now,
 		}
 
 	} else if isDirectoryRenamed {
 		eventMessage = &entities.Event{
-			Path:      &event.Path,
-			OldPath:   &event.OldPath,
-			Content:   []byte(nil),
+			Path:      path,
+			Content:   content,
+			OldPath:   oldPath,
 			Type:      types.DirectoryRenamedEvent,
 			CreatedAt: now,
 		}
 
 	} else if isFileRenamed {
-		content := string(GetFileContent(event.Path))
 		eventMessage = &entities.Event{
-			Path:      &event.Path,
-			OldPath:   &event.OldPath,
-			Content:   []byte(content),
+			Path:      path,
+			Content:   content,
+			OldPath:   oldPath,
 			Type:      types.FileRenamedEvent,
 			CreatedAt: now,
 		}
 	} else if isDirectoryMoved {
 		eventMessage = &entities.Event{
-			Path:      &event.Path,
-			OldPath:   &event.OldPath,
-			Content:   []byte(nil),
+			Path:      path,
+			Content:   content,
+			OldPath:   oldPath,
 			Type:      types.DirectoryMovedEvent,
 			CreatedAt: now,
 		}
 	} else if isFileMoved {
-		content := string(GetFileContent(event.Path))
 		eventMessage = &entities.Event{
-			Path:      &event.Path,
-			OldPath:   &event.OldPath,
-			Content:   []byte(content),
+			Path:      path,
+			Content:   content,
+			OldPath:   oldPath,
 			Type:      types.FileMovedEvent,
 			CreatedAt: now,
 		}
@@ -242,11 +246,11 @@ func ListenServer(wsConnection *entities.Connector, w *watcher.Watcher) {
 
 }
 
-func ListenChanges(w *watcher.Watcher, wsConnection *entities.Connector) {
+func ListenChanges(w *watcher.Watcher, wsConnection *entities.Connector, isHost bool) {
 	for {
 		select {
 		case event := <-w.Event:
-			HandleEvent(event, wsConnection)
+			HandleEvent(event, wsConnection, isHost)
 		case err := <-w.Error:
 			log.Fatalln(err)
 		case <-w.Closed:
@@ -280,4 +284,27 @@ func showInstructions(guestWorkspacePath string) {
 	log.Printf("> Run [cd %s]", guestWorkspacePath)
 	log.Println("> Then open your text editor and start to editing")
 	log.Println("==================================")
+}
+
+func GetDestinationPath(path string, isHost bool) *string {
+	if len(strings.TrimSpace(path)) == 0 {
+		return nil
+	}
+
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		log.Println("error while getting home directory: ", err)
+		return nil
+	}
+
+	destinationPath := path
+	guestWorkspacePath := filepath.Join(homeDir, constants.GUEST_WORKSPACE)
+
+	if isHost {
+		destinationPath = filepath.Join(guestWorkspacePath, destinationPath)
+	} else {
+		destinationPath = strings.TrimPrefix(destinationPath, guestWorkspacePath)
+	}
+
+	return &destinationPath
 }
