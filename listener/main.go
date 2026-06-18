@@ -38,11 +38,6 @@ func main() {
 	w := watcher.New()
 	defer w.Close()
 
-	//ignored := services.GetIgnoredFiled()
-	//if err := w.Ignore(ignored...); err != nil {
-	//	log.Fatal("error while ignoring files in .disignore")
-	//}
-
 	var baseURL string = os.Getenv("SERVER_URL")
 	var targetURL string = "host"
 
@@ -88,6 +83,7 @@ func main() {
 		if err != nil {
 			log.Fatal("error while finding directories")
 		}
+		w.IgnoreHiddenFiles(true)
 
 		if err := w.AddRecursive(*workspace); err != nil {
 			log.Fatalln(err)
